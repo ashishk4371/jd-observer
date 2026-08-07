@@ -1,0 +1,79 @@
+/* Glassmorphism floating action button for JD Analyzer */
+.jd-analyzer-floating-pill {
+  position: absolute;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #f8fafc;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease-in-out;
+  animation: jdPillPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.jd-analyzer-floating-pill:hover {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: #818cf8;
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(129, 140, 248, 0.5);
+}
+
+.jd-analyzer-floating-pill:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.jd-analyzer-floating-pill .jd-icon {
+  display: inline-block;
+  font-size: 14px;
+  animation: jdPulse 1.8s infinite;
+}
+
+@keyframes jdPillPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes jdPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+
+/* Toast confirmation popup */
+.jd-analyzer-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  animation: jdToastIn 0.3s ease-out;
+}
+
+@keyframes jdToastIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

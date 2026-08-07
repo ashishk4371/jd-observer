@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Description Analyzer</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <!-- Bundled local parsing scripts -->
+  <script src="../lib/pdf.min.js"></script>
+  <script src="../lib/mammoth.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">⚡</div>
+        <div class="brand-text">
+          <h1>JD Analyzer</h1>
+          <p>AI Resume & Work Experience Matcher</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="apiStatusBadge" class="status-badge status-offline" title="Checking server connection...">
+          <span class="dot"></span> <span class="status-label">Client Mode</span>
+        </span>
+        <button id="btnSettings" class="icon-btn" title="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Settings Overlay -->
+    <div id="settingsPanel" class="settings-panel hidden">
+      <div class="settings-header">
+        <h3>Backend & AI Configuration</h3>
+        <button id="btnCloseSettings" class="icon-btn">✕</button>
+      </div>
+      <div class="setting-field">
+        <label for="apiUrlInput">FastAPI Server URL:</label>
+        <input type="text" id="apiUrlInput" value="http://localhost:8000" placeholder="http://localhost:8000">
+      </div>
+      <div class="setting-field">
+        <label for="apiKeyInput">Gemini / OpenAI / Groq API Key (Optional):</label>
+        <input type="password" id="apiKeyInput" placeholder="sk-... or AIzaSy... (For deep LLM experience analysis)">
+        <p class="setting-help">Stored locally in chrome.storage.local to unlock deep AI work experience reviews.</p>
+      </div>
+      <button id="btnSaveSettings" class="btn btn-primary btn-sm">Save Configuration</button>
+    </div>
+
+    <!-- Main Content Scroll Area -->
+    <main class="main-content">
+
+      <!-- Section 1: Resume Upload & Store -->
+      <section class="card resume-card">
+        <div class="card-header">
+          <h2><span class="icon">📄</span> Your Resume</h2>
+          <span id="resumeBadge" class="pill pill-warning">No Resume Attached</span>
+        </div>
+
+        <div id="dropZone" class="drop-zone">
+          <input type="file" id="resumeFileInput" accept=".pdf,.docx,.txt" class="hidden-file-input">
+          <div class="drop-zone-content">
+            <div class="upload-icon">📁</div>
+            <p class="drop-title">Drop PDF, DOCX, or TXT resume</p>
+            <p class="drop-subtitle">or <span class="browse-link">browse files</span></p>
+          </div>
+        </div>
+
+        <div id="resumeInfo" class="resume-info hidden">
+          <div class="resume-meta">
+            <span class="file-icon">📜</span>
+            <div class="file-details">
+              <span id="resumeFileName" class="file-name">resume.pdf</span>
+              <span id="resumeCharCount" class="file-size">0 chars • 0 skills extracted</span>
+            </div>
+            <button id="btnRemoveResume" class="btn-icon-danger" title="Remove resume">🗑️</button>
+          </div>
+          <details class="text-preview-details">
+            <summary>View Extracted Text</summary>
+            <textarea id="resumeTextPreview" readonly class="text-preview-box"></textarea>
+          </details>
+        </div>
+      </section>
+
+      <!-- Section 2: Job Description Input -->
+      <section class="card jd-card">
+        <div class="card-header">
+          <h2><span class="icon">💼</span> Target Job Description</h2>
+          <button id="btnGrabSelection" class="btn-link" title="Grab active text selection from webpage">⚡ Grab Selection</button>
+        </div>
+        <textarea id="jdInput" class="jd-textarea" placeholder="Paste Job Description here or select text on any webpage and click 'Grab Selection' or 'Analyze with Resume'..."></textarea>
+        <button id="btnAnalyze" class="btn btn-gradient">
+          <span class="btn-text">⚡ Analyze Full Experience & Skill Match</span>
+          <span class="spinner hidden" id="analyzeSpinner"></span>
+        </button>
+      </section>
+
+      <!-- Section 3: Analysis Results (Hidden by default) -->
+      <section id="resultsSection" class="results-section hidden">
+        <!-- Match Score Hero Gauge -->
+        <div class="card score-card">
+          <div class="score-header">
+            <h3>Overall Experience & Skill Score</h3>
+            <span id="scoreLevelBadge" class="score-level-badge level-good">Good Match</span>
+          </div>
+
+          <div class="gauge-container">
+            <svg class="score-gauge" viewBox="0 0 120 120">
+              <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
+              <circle id="gaugeProgress" class="gauge-progress" cx="60" cy="60" r="50" stroke-dasharray="314.15" stroke-dashoffset="314.15"></circle>
+            </svg>
+            <div class="gauge-text">
+              <span id="scorePercent" class="score-value">0%</span>
+              <span class="score-label">MATCH</span>
+            </div>
+          </div>
+
+          <!-- Score Breakdown Grid -->
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <span class="metric-label">Skill Coverage</span>
+              <span id="metricSkill" class="metric-val">0%</span>
+              <div class="bar-bg"><div id="barSkill" class="bar-fill" style="width:0%"></div></div>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Semantic Match</span>
+              <span id="metricSemantic" class="metric-val">0%</span>
+              <div class="bar-bg"><div id="barSemantic" class="bar-fill" style="width:0%"></div></div>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Keyword Density</span>
+              <span id="metricKeyword" class="metric-val">0%</span>
+              <div class="bar-bg"><div id="barKeyword" class="bar-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-tab="tabExperience">🤖 AI Experience Review</button>
+          <button class="tab-btn" data-tab="tabSkills">Skills Gap</button>
+          <button class="tab-btn" data-tab="tabRewrites">Bullet Rewrites</button>
+          <button class="tab-btn" data-tab="tabSummary">Summary</button>
+        </div>
+
+        <!-- Tab 0: Deep AI Experience Review -->
+        <div id="tabExperience" class="tab-content active">
+          <div class="card tab-card">
+            <div class="exp-header">
+              <h3>Work History & Career Alignment</h3>
+              <span id="llmEngineBadge" class="pill pill-info">AI Engine</span>
+            </div>
+
+            <div class="seniority-box">
+              <span class="box-label">Seniority & Level Fit</span>
+              <p id="seniorityFitText" class="box-value">Evaluating alignment...</p>
+            </div>
+
+            <h4 class="subhead">Demonstrated Past Responsibilities</h4>
+            <ul id="responsibilityOverlapList" class="exp-list check-list">
+              <!-- Inserted dynamically -->
+            </ul>
+
+            <h4 class="subhead">Missing Work Experience / Gaps to Address</h4>
+            <ul id="experienceGapsList" class="exp-list gap-list">
+              <!-- Inserted dynamically -->
+            </ul>
+
+            <h4 class="subhead">Strategic Interview & Application Advice</h4>
+            <p id="strategicAdviceText" class="summary-paragraph"></p>
+          </div>
+        </div>
+
+        <!-- Tab 1: Missing Skills -->
+        <div id="tabSkills" class="tab-content">
+          <div class="card tab-card">
+            <h3>Skill Gap Analysis</h3>
+            <p class="tab-desc">Skills found in the job description that were not detected in your resume:</p>
+            <div id="missingSkillsChips" class="chips-container">
+              <!-- Chips inserted dynamically -->
+            </div>
+
+            <h4 class="subhead">Matched Skills</h4>
+            <div id="matchedSkillsChips" class="chips-container">
+              <!-- Chips inserted dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Bullet Rewrites -->
+        <div id="tabRewrites" class="tab-content">
+          <div class="card tab-card">
+            <h3>Tailored Experience Bullet Recommendations</h3>
+            <p class="tab-desc">Transform your past work achievements to directly target the job description requirements:</p>
+            <div id="rewriteList" class="rewrites-list">
+              <!-- Rewrites inserted dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Summary & Tips -->
+        <div id="tabSummary" class="tab-content">
+          <div class="card tab-card">
+            <h3>Actionable Optimization Tips</h3>
+            <p id="analysisSummaryText" class="summary-paragraph"></p>
+            <ul id="actionTipsList" class="tips-list">
+              <!-- Action tips inserted dynamically -->
+            </ul>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

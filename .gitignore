@@ -1,0 +1,22 @@
+# Environment & Secret files
+.env
+.env.*
+!.env.example
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.log
+
+# Zip packages & artifacts
+*.zip
+
+# Virtual environments & IDE
+.venv
+.idea/
+.vscode/
+.DS_Store

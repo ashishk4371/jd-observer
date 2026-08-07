@@ -1,0 +1,33 @@
+[project]
+name = "jd-analyzer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+    "python-docx>=1.1.0",
+    "pymupdf>=1.28.0",
+    "scikit-learn>=1.4.0",
+    "numpy>=1.26.0",
+    "pydantic>=2.13.4",
+    "pillow>=10.0.0",
+    "ipykernel>=6.31.0",
+    "langchain>=1.1.0",
+    "langchain-community>=0.4.1",
+    "langchain-google-genai>=3.2.0",
+    "langchain-groq>=1.1.0",
+    "langchain-ollama>=1.1.0",
+    "langchain-openai>=1.1.0",
+    "python-dotenv>=1.2.1",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+jd-analyzer = "jd_analyzer.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
