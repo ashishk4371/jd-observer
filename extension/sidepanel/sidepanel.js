@@ -64,6 +64,7 @@ const elements = {
   missingSkillsChips: document.getElementById("missingSkillsChips"),
   matchedSkillsChips: document.getElementById("matchedSkillsChips"),
   rewriteList: document.getElementById("rewriteList"),
+  additionsList: document.getElementById("additionsList"),
   analysisSummaryText: document.getElementById("analysisSummaryText"),
   actionTipsList: document.getElementById("actionTipsList")
 };
@@ -429,6 +430,11 @@ function computeClientAnalysis(resumeText, jdText) {
   const suggestedAdditions = missingSkills.map(s => `Add '${s}' to your Skills or Experience bullets.`);
   const rewrites = missingSkills.slice(0, 3).map(s => `Leveraged ${s} to optimize feature performance and streamline application workflow.`);
 
+  // Generate suggested resume additions reflecting similar experience to the JD requirements
+  const resumeAdditions = missingSkills.slice(0, 4).map(s =>
+    `Add a bullet demonstrating hands-on experience with ${s} — reframe a past project to highlight this responsibility and quantify the impact (e.g. 'Improved efficiency by X%').`
+  );
+
   return {
     match_score: overallScore,
     score_level: scoreLevel,
@@ -447,6 +453,11 @@ function computeClientAnalysis(resumeText, jdText) {
     experience: {
       experience_gap: missingSkills.length > 0 ? `Target resume contains ${missingSkills.length} unrepresented technical requirements.` : "Strong skill match found.",
       rewrite_suggestions: rewrites
+    },
+    llm_analysis: {
+      is_llm_powered: false,
+      provider_used: "Standalone Engine",
+      resume_additions: resumeAdditions
     },
     summary: `Overall Match: ${overallScore}% (${scoreLevel}). Detected ${matchedSkills.length} matching skills and ${missingSkills.length} skill gaps.`,
     actionable_tips: [
@@ -548,6 +559,26 @@ function renderAnalysisResults(res) {
     `).join("");
 
     elements.rewriteList.querySelectorAll(".btn-copy-bullet").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const text = e.target.getAttribute("data-text");
+        copyToClipboard(text, e.target);
+      });
+    });
+  }
+
+  // Render Suggested Resume Additions
+  const additions = (res.llm_analysis && res.llm_analysis.resume_additions) || [];
+  if (additions.length === 0) {
+    elements.additionsList.innerHTML = `<p class="tab-desc">No specific additions suggested. Your experience already reflects the role's requirements.</p>`;
+  } else {
+    elements.additionsList.innerHTML = additions.map((text, idx) => `
+      <div class="rewrite-card">
+        <div class="rewrite-text">➕ ${escapeHtml(text)}</div>
+        <button class="btn-copy-bullet" data-text="${escapeHtml(text)}">Copy Bullet</button>
+      </div>
+    `).join("");
+
+    elements.additionsList.querySelectorAll(".btn-copy-bullet").forEach(btn => {
       btn.addEventListener("click", (e) => {
         const text = e.target.getAttribute("data-text");
         copyToClipboard(text, e.target);

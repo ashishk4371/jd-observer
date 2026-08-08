@@ -47,7 +47,6 @@ async def upload_resume(file: UploadFile = File(...)):
             status_code=400,
             detail="Unsupported format. Supported extensions: .pdf, .docx, .txt"
         )
-    
     try:
         content_bytes = await file.read()
         extracted_text = extract_text_from_file(content_bytes, fname)
@@ -169,6 +168,7 @@ async def analyze(request: AnalyzeRequest):
             responsibility_overlap=llm_res.responsibility_overlap,
             experience_gaps=llm_res.experience_gaps,
             tailored_bullet_rewrites=llm_res.tailored_bullet_rewrites,
+            resume_additions=llm_res.resume_additions,
             strategic_advice=llm_res.strategic_advice
         ),
         summary=summary,

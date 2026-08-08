@@ -41,6 +41,7 @@ class LLMExperienceAnalysis(BaseModel):
     responsibility_overlap: List[str] = []
     experience_gaps: List[str] = []
     tailored_bullet_rewrites: List[str] = []
+    resume_additions: List[str] = []
     strategic_advice: str = ""
 
 class AnalyzeResponse(BaseModel):
