@@ -1,5 +1,27 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
+
+class ResumeRole(BaseModel):
+    title: str
+    company: Optional[str] = None
+    duration: Optional[str] = None
+    bullets: List[str] = []
+
+class ResumeProfile(BaseModel):
+    summary: str
+    seniority_level: str
+    total_years_experience: Optional[float] = None
+    skills: List[str] = []
+    domains: List[str] = []
+    roles: List[ResumeRole] = []
+    key_achievements: List[str] = []
+    is_llm_powered: bool = False
+
+class RequirementMatch(BaseModel):
+    requirement: str
+    status: Literal["Met", "Partial", "Missing"]
+    evidence: Optional[str] = None
+    suggested_edit: Optional[str] = None
 
 class ResumeUploadResponse(BaseModel):
     resume_id: str
@@ -7,6 +29,7 @@ class ResumeUploadResponse(BaseModel):
     extracted_text_length: int
     parsed_skills_count: int
     message: str
+    resume_profile: Optional[ResumeProfile] = None
 
 class AnalyzeRequest(BaseModel):
     resume_id: Optional[str] = None
@@ -43,6 +66,7 @@ class LLMExperienceAnalysis(BaseModel):
     tailored_bullet_rewrites: List[str] = []
     resume_additions: List[str] = []
     strategic_advice: str = ""
+    requirement_matches: List[RequirementMatch] = []
 
 class AnalyzeResponse(BaseModel):
     match_score: float          # 0 - 100

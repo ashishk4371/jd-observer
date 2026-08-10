@@ -1,8 +1,11 @@
 import re
 from typing import Optional, List, Dict, Any
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+load_dotenv()
 
 from .models import (
     ResumeUploadResponse,
@@ -12,11 +15,12 @@ from .models import (
     SkillMatchDetail,
     ExperienceMatchDetail,
     LLMExperienceAnalysis,
+    ResumeProfile,
 )
 from .resume_store import resume_store
 from .extractor import extract_text_from_file, extract_skills
 from .similarity import compute_similarity_metrics
-from .llm import analyze_experience_with_llm
+from .llm import build_resume_profile, match_resume_to_jd
 
 app = FastAPI(
     title="Job Description Analyzer API",
@@ -40,7 +44,11 @@ async def health_check():
 
 
 @app.post("/upload_resume", response_model=ResumeUploadResponse)
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(
+    file: UploadFile = File(...),
+    api_key: Optional[str] = Form(None),
+    provider: Optional[str] = Form("auto"),
+):
     fname = file.filename or "resume.txt"
     if not fname.lower().endswith((".txt", ".pdf", ".docx")):
         raise HTTPException(
@@ -65,22 +73,33 @@ async def upload_resume(file: UploadFile = File(...)):
     rid = resume_store.add(extracted_text, filename=fname)
     skills = extract_skills(extracted_text)
 
+    # Build (or reuse a disk-cached) structured profile so repeated JD comparisons
+    # against this resume don't need to re-derive its content from scratch each time.
+    profile_dict = resume_store.get_profile(rid)
+    if profile_dict is None:
+        profile_result = build_resume_profile(extracted_text, api_key=api_key, provider=provider or "auto")
+        profile_dict = profile_result.model_dump()
+        resume_store.set_profile(rid, profile_dict)
+
     return ResumeUploadResponse(
         resume_id=rid,
         filename=fname,
         extracted_text_length=len(extracted_text),
         parsed_skills_count=len(skills),
-        message="Resume uploaded and parsed successfully!"
+        message="Resume uploaded and parsed successfully!",
+        resume_profile=ResumeProfile(**profile_dict)
     )
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     resume_text = ""
+    profile_dict = None
     if request.resume_id:
         stored = resume_store.get(request.resume_id)
         if stored:
             resume_text = stored
+            profile_dict = resume_store.get_profile(request.resume_id)
 
     if not resume_text and request.resume_text:
         resume_text = request.resume_text
@@ -101,9 +120,16 @@ async def analyze(request: AnalyzeRequest):
     metrics = compute_similarity_metrics(resume_text, request.job_description)
     score = metrics["overall_score"]
 
-    # 2. Perform Deep LLM Experience Evaluation
-    llm_res = analyze_experience_with_llm(
-        resume_text=resume_text,
+    # 2. Resolve the resume's structured profile (cached when resume_id was uploaded
+    # via /upload_resume; built on the fly otherwise) and run requirement-level matching.
+    if profile_dict is None:
+        profile_result = build_resume_profile(resume_text, api_key=request.api_key, provider=request.provider or "auto")
+        profile_dict = profile_result.model_dump()
+        if request.resume_id:
+            resume_store.set_profile(request.resume_id, profile_dict)
+
+    llm_res = match_resume_to_jd(
+        profile=profile_dict,
         job_description=request.job_description,
         api_key=request.api_key,
         provider=request.provider or "auto"
@@ -164,6 +190,7 @@ async def analyze(request: AnalyzeRequest):
             is_llm_powered=llm_res.is_llm_powered,
             provider_used=llm_res.provider_used,
             career_alignment_score=llm_res.career_alignment_score,
+            requirement_matches=llm_res.requirement_matches,
             seniority_fit=llm_res.seniority_fit,
             responsibility_overlap=llm_res.responsibility_overlap,
             experience_gaps=llm_res.experience_gaps,

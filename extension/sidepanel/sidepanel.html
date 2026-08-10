@@ -39,9 +39,18 @@
         <input type="text" id="apiUrlInput" value="http://localhost:8000" placeholder="http://localhost:8000">
       </div>
       <div class="setting-field">
-        <label for="apiKeyInput">Gemini / OpenAI / Groq API Key (Optional):</label>
-        <input type="password" id="apiKeyInput" placeholder="sk-... or AIzaSy... (For deep LLM experience analysis)">
-        <p class="setting-help">Stored locally in chrome.storage.local to unlock deep AI work experience reviews.</p>
+        <label for="providerSelect">AI Model Provider:</label>
+        <select id="providerSelect">
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="gemini">Gemini (Google)</option>
+          <option value="openai">OpenAI</option>
+          <option value="groq">Groq</option>
+        </select>
+      </div>
+      <div class="setting-field">
+        <label for="apiKeyInput" id="apiKeyLabel">API Key for Claude:</label>
+        <input type="password" id="apiKeyInput" placeholder="Enter your API key for the selected provider">
+        <p class="setting-help">Each provider's key is stored separately in chrome.storage.local. Switch providers above to enter a different key.</p>
       </div>
       <button id="btnSaveSettings" class="btn btn-primary btn-sm">Save Configuration</button>
     </div>
@@ -77,6 +86,23 @@
           <details class="text-preview-details">
             <summary>View Extracted Text</summary>
             <textarea id="resumeTextPreview" readonly class="text-preview-box"></textarea>
+          </details>
+          <details id="profileSnapshotDetails" class="text-preview-details hidden">
+            <summary>🧠 What We Understood About You</summary>
+            <div class="profile-snapshot">
+              <p id="profileSummaryText" class="profile-summary-text"></p>
+              <div class="profile-meta-row">
+                <span class="profile-meta-item"><strong>Seniority:</strong> <span id="profileSeniorityText"></span></span>
+              </div>
+              <div class="profile-meta-row">
+                <strong>Domains:</strong>
+                <div id="profileDomainsChips" class="chips-container"></div>
+              </div>
+              <div class="profile-meta-row">
+                <strong>Key Skills:</strong>
+                <div id="profileSkillsChips" class="chips-container"></div>
+              </div>
+            </div>
           </details>
         </div>
       </section>
@@ -156,15 +182,11 @@
               <p id="seniorityFitText" class="box-value">Evaluating alignment...</p>
             </div>
 
-            <h4 class="subhead">Demonstrated Past Responsibilities</h4>
-            <ul id="responsibilityOverlapList" class="exp-list check-list">
-              <!-- Inserted dynamically -->
-            </ul>
-
-            <h4 class="subhead">Missing Work Experience / Gaps to Address</h4>
-            <ul id="experienceGapsList" class="exp-list gap-list">
-              <!-- Inserted dynamically -->
-            </ul>
+            <h4 class="subhead">Requirement-by-Requirement Match</h4>
+            <p class="tab-desc">Each requirement pulled from the job description, checked against your resume:</p>
+            <div id="requirementMatrixList" class="requirement-matrix">
+              <!-- Requirement cards inserted dynamically -->
+            </div>
 
             <h4 class="subhead">Strategic Interview & Application Advice</h4>
             <p id="strategicAdviceText" class="summary-paragraph"></p>
