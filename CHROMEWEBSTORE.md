@@ -1,17 +1,17 @@
-# Chrome Web Store Listing — Job Description Analyzer
+# Chrome Web Store Listing — JD Glance
 
 > Last Updated: 2026-08-06
 
 ## Store Listing
 
 **Extension Name**
-Job Description Analyzer - AI Resume Matcher
+JD Glance - AI Resume Matcher
 
 **Short Description**
 Compare job descriptions with your resume (PDF/DOCX/TXT). Get instant match score, skill gaps, and bullet rewrites.
 
 **Detailed Description**
-Job Description Analyzer is a smart productivity tool designed to help job seekers tailor their resumes for maximum ATS and recruiters match rate.
+JD Glance is a smart productivity tool designed to help job seekers tailor their resumes for maximum ATS and recruiters match rate.
 
 Select any job description text on any website (LinkedIn, Indeed, Greenhouse, Lever, Workday) and instantly analyze how well your resume matches the job requirements.
 
@@ -25,7 +25,7 @@ Key Features:
 - Privacy First: Operates fully standalone in client-side mode with local file parsing.
 
 How to Use:
-1. Open the Job Description Analyzer side panel by clicking the extension icon.
+1. Open the JD Glance side panel by clicking the extension icon.
 2. Upload or drag-and-drop your resume (PDF, Word DOCX, or TXT format).
 3. Highlight any job description text on a webpage and click 'Analyze with Resume'.
 4. View your match score gauge, missing skill tags, and copy tailored bullet suggestions.
@@ -92,7 +92,7 @@ Every permission in `manifest.json` is strictly required for core user-facing ex
 ## Privacy Policy
 
 **Privacy Policy URL**
-`https://github.com/ashishk/jd-analyzer/blob/main/PRIVACY_POLICY.md`
+`https://github.com/ashishk4371/jd-glance/blob/main/PRIVACY_POLICY.md`
 
 
 ## Distribution
@@ -104,9 +104,9 @@ Every permission in `manifest.json` is strictly required for core user-facing ex
 
 ## Developer Info
 
-- **Publisher Name**: Job Description Analyzer
-- **Contact Email**: support@jdanalyzer.example.com
-- **Homepage URL**: `https://github.com/ashishk/jd-analyzer`
+- **Publisher Name**: JD Glance
+- **Contact Email**: support@jdglance.example.com
+- **Homepage URL**: `https://github.com/ashishk4371/jd-glance`
 
 
 ## Step-by-Step Publishing Guide
@@ -116,7 +116,7 @@ Create a clean `.zip` archive containing ONLY the files in the `extension/` dire
 
 Run command in root folder:
 ```bash
-cd extension && zip -r ../jd-analyzer-extension.zip . -x "*.DS_Store"
+cd extension && zip -r ../jd-glance-extension.zip . -x "*.DS_Store"
 ```
 
 ### Step 2: Open Chrome Developer Dashboard
@@ -125,11 +125,11 @@ cd extension && zip -r ../jd-analyzer-extension.zip . -x "*.DS_Store"
 
 ### Step 3: Create New Item
 1. Click the **Add new item** button in the top right.
-2. Upload the `jd-analyzer-extension.zip` file created in Step 1.
+2. Upload the `jd-glance-extension.zip` file created in Step 1.
 
 ### Step 4: Fill Store Listing Details
 Copy and paste the exact information from this document (`CHROMEWEBSTORE.md`):
-- Name: `Job Description Analyzer - AI Resume Matcher`
+- Name: `JD Glance - AI Resume Matcher`
 - Short description & Detailed description
 - Category: `Productivity`
 - Single Purpose description

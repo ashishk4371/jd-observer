@@ -80,23 +80,36 @@ def _key_for_provider(name: str, api_key: Optional[str], requested_provider: str
     return None
 
 
-def _resolve_llm(api_key: Optional[str], provider: str = "auto") -> Tuple[Optional[Any], str]:
-    """Resolve a chat model for the requested provider (claude/gemini/openai/groq), or the
-    first provider with an available key when provider is "auto". Falls back to the
-    heuristic engine if no provider can be initialized."""
-    order = [provider] if provider in PROVIDER_REGISTRY else list(PROVIDER_REGISTRY.keys())
+def _resolve_llm_candidates(api_key: Optional[str], provider: str = "auto") -> List[Tuple[Any, str]]:
+    """Build an ordered list of (llm, label) candidates to try. The requested provider
+    (if any) comes first; every other server-configured provider follows as a fallback
+    (env vars only — a caller-supplied api_key is never applied to a provider it wasn't
+    submitted for, via _key_for_provider's existing scoping). Returning a *list* rather
+    than a single resolved client is what lets the caller retry on a different provider
+    when one fails at the actual API call — not just when it has no key at all. A
+    configured-but-broken key (exhausted quota, revoked, rate-limited) looks identical
+    to "no key" from the caller's perspective otherwise, and silently dropping to the
+    keyword-only heuristic engine when another working provider is available is a worse
+    outcome than using a different model."""
+    requested = provider if provider in PROVIDER_REGISTRY else None
+    order = [requested] + [p for p in PROVIDER_REGISTRY if p != requested] if requested else list(PROVIDER_REGISTRY.keys())
 
+    candidates: List[Tuple[Any, str]] = []
     for name in order:
         key = _key_for_provider(name, api_key, provider)
         if not key:
             continue
         init_fn, label, _ = PROVIDER_REGISTRY[name]
         try:
-            return init_fn(key), label
+            llm = init_fn(key)
         except Exception as e:
             logger.warning(f"Failed to initialize {label}: {e}")
+            continue
+        if requested and name != requested:
+            label = f"{label} (fallback — {PROVIDER_REGISTRY[requested][1]} was unavailable)"
+        candidates.append((llm, label))
 
-    return None, "rule_engine"
+    return candidates
 
 
 def _extract_text(content: Any) -> str:
@@ -157,10 +170,12 @@ def build_resume_profile(
     api_key: Optional[str] = None,
     provider: str = "auto"
 ) -> ResumeProfileResult:
-    """Extract a structured, reusable profile from a resume. Called once per unique resume."""
-    llm, provider_used = _resolve_llm(api_key, provider)
+    """Extract a structured, reusable profile from a resume. Called once per unique resume.
+    Tries each available provider in turn — a broken/exhausted key on one provider falls
+    through to the next rather than dropping straight to the heuristic engine."""
+    candidates = _resolve_llm_candidates(api_key, provider)
 
-    if llm:
+    for llm, label in candidates:
         try:
             prompt = RESUME_PROFILE_PROMPT.format(resume_text=resume_text[:16000])
             response = llm.invoke(prompt)
@@ -176,7 +191,8 @@ def build_resume_profile(
                 key_achievements=data.get("key_achievements", []),
             )
         except Exception as err:
-            logger.error(f"Resume profile LLM extraction failed: {err}")
+            logger.error(f"Resume profile extraction failed via {label}: {err}")
+            continue
 
     return heuristic_resume_profile(resume_text)
 
@@ -297,10 +313,12 @@ def match_resume_to_jd(
     api_key: Optional[str] = None,
     provider: str = "auto"
 ) -> LLMExperienceAnalysisResult:
-    """Compare a previously-extracted resume profile against a JD, requirement-by-requirement."""
-    llm, provider_used = _resolve_llm(api_key, provider)
+    """Compare a previously-extracted resume profile against a JD, requirement-by-requirement.
+    Tries each available provider in turn — a broken/exhausted key on one provider falls
+    through to the next rather than dropping straight to the heuristic engine."""
+    candidates = _resolve_llm_candidates(api_key, provider)
 
-    if llm:
+    for llm, label in candidates:
         try:
             prompt = MATCH_PROMPT.format(
                 profile_json=json.dumps(profile)[:8000],
@@ -311,14 +329,15 @@ def match_resume_to_jd(
             matches = data.get("requirement_matches", [])
             return _build_result_from_matches(
                 is_llm_powered=True,
-                provider_used=provider_used,
+                provider_used=label,
                 career_alignment_score=float(data.get("career_alignment_score", 75.0)),
                 seniority_fit=data.get("seniority_fit", "Aligned with job level"),
                 strategic_advice=data.get("strategic_advice", ""),
                 matches=matches,
             )
         except Exception as err:
-            logger.error(f"LLM requirement matching failed: {err}")
+            logger.error(f"LLM requirement matching failed via {label}: {err}")
+            continue
 
     return heuristic_requirement_match(profile, job_description)
 
@@ -355,8 +374,83 @@ def _build_result_from_matches(
     )
 
 
+STOPWORDS = {
+    "about", "above", "after", "again", "against", "because", "before", "being", "below",
+    "between", "during", "further", "having", "other", "should", "there", "these", "those",
+    "through", "under", "until", "where", "which", "while", "would", "years", "year",
+}
+
+REQUIREMENT_SIGNAL_RE = re.compile(
+    r"\b(experience|proficien|familiar|knowledge of|responsible for|ability to|degree|"
+    r"required|requirements?|must have|you will|you have|skills? in|expertise|"
+    r"strong understanding|hands-on|track record)\b",
+    re.IGNORECASE,
+)
+
+
+def _truncate_at_word(text: str, limit: int) -> str:
+    """Truncate at the last whitespace before `limit` instead of mid-word."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return (cut or text[:limit]).rstrip(",;:") + "…"
+
+
+def _select_requirement_sentences(jd_text: str, limit: int = 8) -> List[str]:
+    """Pick the JD sentences that actually read like requirements, not the first N
+    sentences in document order — which are usually "About the company" boilerplate."""
+    candidates = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", jd_text) if len(s.strip()) > 20]
+    jd_skills = set(extract_skills(jd_text))
+
+    scored = []
+    for sentence in candidates:
+        score = 0
+        if REQUIREMENT_SIGNAL_RE.search(sentence):
+            score += 2
+        if any(skill.lower() in sentence.lower() for skill in jd_skills):
+            score += 2
+        if re.search(r"\d+\+?\s*years?", sentence, re.IGNORECASE):
+            score += 1
+        if score > 0:
+            scored.append((score, sentence))
+
+    if not scored:
+        # No sentence scored as requirement-like — fall back to whatever exists
+        return candidates[:limit]
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [s for _, s in scored[:limit]]
+
+
+def _most_relevant_bullet(sentence: str, profile: dict) -> Optional[str]:
+    """Find the resume bullet/achievement that overlaps most with a JD sentence, so a
+    suggestion can point at rewriting something real instead of inventing a fake one."""
+    candidates = list(profile.get("key_achievements", []))
+    for role in profile.get("roles", []):
+        candidates.extend(role.get("bullets", []))
+    if not candidates:
+        return None
+
+    sentence_words = {w for w in re.findall(r"[a-z]{4,}", sentence.lower()) if w not in STOPWORDS}
+    if not sentence_words:
+        return None
+
+    best, best_score = None, 0
+    for bullet in candidates:
+        bullet_words = set(re.findall(r"[a-z]{4,}", bullet.lower()))
+        overlap = len(sentence_words & bullet_words)
+        if overlap > best_score:
+            best, best_score = bullet, overlap
+
+    return best if best_score >= 1 else None
+
+
 def heuristic_requirement_match(profile: dict, jd_text: str) -> LLMExperienceAnalysisResult:
-    """Non-LLM fallback: word-overlap scoring of JD requirement sentences against the profile."""
+    """Non-LLM fallback: word-overlap scoring of JD requirement sentences against the profile.
+    No LLM means no ability to draft new prose truthfully — so where a relevant existing
+    resume bullet can be found, the suggestion points at rewriting that real bullet rather
+    than inventing a plausible-sounding but fabricated one."""
     profile_blob = " ".join([
         profile.get("summary", ""),
         " ".join(profile.get("skills", [])),
@@ -365,35 +459,39 @@ def heuristic_requirement_match(profile: dict, jd_text: str) -> LLMExperienceAna
         " ".join(b for role in profile.get("roles", []) for b in role.get("bullets", [])),
     ]).lower()
 
-    jd_sentences = [s.strip() for s in jd_text.split(".") if len(s.strip()) > 20][:8]
+    jd_sentences = _select_requirement_sentences(jd_text)
 
     matches = []
     for sentence in jd_sentences:
         words = [w for w in sentence.lower().split() if len(w) > 4]
         match_count = sum(1 for w in words if w in profile_blob)
         ratio = (match_count / len(words)) if words else 0
+        requirement_text = _truncate_at_word(sentence, 150)
 
         if ratio >= 0.5:
             status = "Met"
             evidence = "Overlapping terms found across your resume's skills/experience bullets."
             suggested_edit = None
-        elif ratio >= 0.2:
-            status = "Partial"
-            evidence = None
-            suggested_edit = (
-                f"Reframe a relevant past project to explicitly call out: '{sentence[:110]}' "
-                f"— quantify the impact (e.g. 'Improved X by Y%')."
-            )
         else:
-            status = "Missing"
+            status = "Partial" if ratio >= 0.2 else "Missing"
             evidence = None
-            suggested_edit = (
-                f"Add a bullet demonstrating experience with: '{sentence[:110]}' — "
-                f"reframe a past project to highlight this responsibility and quantify the impact."
-            )
+            relevant_bullet = _most_relevant_bullet(sentence, profile)
+            requirement_snippet = _truncate_at_word(sentence, 110)
+            if relevant_bullet:
+                suggested_edit = (
+                    f"Rewrite this existing bullet to explicitly cover \"{requirement_snippet}\": "
+                    f"\"{_truncate_at_word(relevant_bullet, 140)}\" — add the specific tool, scale, "
+                    f"or outcome that ties it to this requirement."
+                )
+            else:
+                suggested_edit = (
+                    f"Your resume doesn't appear to mention \"{requirement_snippet}\" — if you have "
+                    f"real experience with this, add a bullet naming the specific tool/method you used, "
+                    f"the scale involved, and a quantified outcome (don't invent numbers you can't back up)."
+                )
 
         matches.append({
-            "requirement": sentence[:150],
+            "requirement": requirement_text,
             "status": status,
             "evidence": evidence,
             "suggested_edit": suggested_edit,
@@ -412,6 +510,6 @@ def heuristic_requirement_match(profile: dict, jd_text: str) -> LLMExperienceAna
         provider_used="Rule Engine (Add API Key in Settings for Deep LLM Analysis)",
         career_alignment_score=70.0,
         seniority_fit="Moderate alignment — Review key responsibility gaps",
-        strategic_advice="To get deep AI-powered work experience evaluations, add your Gemini, OpenAI, or Groq API Key in the extension settings!",
+        strategic_advice="This analysis used the keyword-only rule engine, not an AI model — none of your configured API keys were reachable. Add a working key in the extension settings for a real, resume-grounded review.",
         matches=matches,
     )

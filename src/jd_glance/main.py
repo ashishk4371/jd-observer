@@ -1,4 +1,5 @@
 import hashlib
+import os
 import re
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
@@ -84,15 +85,24 @@ def get_or_embed_job_description(text: str) -> Dict[str, Any]:
     return db.get_job_description_by_hash(h)
 
 app = FastAPI(
-    title="Job Description Analyzer API",
-    description="Backend API for Job Description Analyzer Chrome Extension",
+    title="JD Glance API",
+    description="Backend API for the JD Glance Chrome Extension",
     version="1.1.0"
 )
 
-# Enable CORS for browser extension and localhost clients
+# Enable CORS for the browser extension and local dev clients.
+# ALLOWED_ORIGINS is a comma-separated env var (e.g. "chrome-extension://<id>")
+# so production can lock this down; unset defaults to "*" for local development.
+_allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "").strip()
+_allowed_origins = (
+    [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+    if _allowed_origins_env
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows extension and local dev origins
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,7 +111,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "Job Description Analyzer API"}
+    return {"status": "ok", "service": "JD Glance API"}
 
 
 @app.post("/upload_resume", response_model=ResumeUploadResponse)
@@ -364,7 +374,7 @@ async def compare_resumes(request: CompareResumesRequest):
 def main():
     """CLI entry point to launch uvicorn server."""
     import uvicorn
-    uvicorn.run("jd_analyzer.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("jd_glance.main:app", host="127.0.0.1", port=8000, reload=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,15 @@
+services:
+  jd-glance:
+    build: .
+    image: jd-glance:latest
+    restart: unless-stopped
+    # Only reachable on the host itself — Caddy is the one thing exposed publicly.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - jd-glance-data:/data
+
+volumes:
+  jd-glance-data:

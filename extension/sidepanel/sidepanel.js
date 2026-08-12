@@ -1,4 +1,4 @@
-// Sidepanel Script for Job Description Analyzer
+// Sidepanel Script for JD Glance
 
 // Configure PDF.js worker
 if (window.pdfjsLib) {
@@ -792,29 +792,77 @@ function computeClientAnalysis(resumeText, jdText) {
   };
 }
 
+const REQUIREMENT_SIGNAL_RE = /\b(experience|proficien|familiar|knowledge of|responsible for|ability to|degree|required|requirements?|must have|you will|you have|skills? in|expertise|strong understanding|hands-on|track record)\b/i;
+
+// Truncate at the last whitespace before `limit` instead of mid-word
+function truncateAtWord(text, limit) {
+  text = text.trim();
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit).split(" ").slice(0, -1).join(" ");
+  return (cut || text.slice(0, limit)).replace(/[,;:]+$/, "") + "…";
+}
+
+// Score JD sentences by how requirement-like they read, instead of just taking the
+// first few in document order (which is usually "About the company" boilerplate)
+function selectRequirementSentences(jdText, limit = 8) {
+  const candidates = jdText.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length > 20);
+  const jdSkills = extractSkillsClient(jdText);
+
+  const scored = candidates.map(sentence => {
+    let score = 0;
+    if (REQUIREMENT_SIGNAL_RE.test(sentence)) score += 2;
+    if (jdSkills.some(skill => sentence.toLowerCase().includes(skill.toLowerCase()))) score += 2;
+    if (/\d+\+?\s*years?/i.test(sentence)) score += 1;
+    return { sentence, score };
+  }).filter(s => s.score > 0);
+
+  if (!scored.length) return candidates.slice(0, limit);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map(s => s.sentence);
+}
+
+// Find the resume line that overlaps most with a JD sentence, so a suggestion can
+// point at rewriting something real instead of inventing a plausible-sounding fake one
+function mostRelevantResumeLine(sentence, resumeText) {
+  const sentenceWords = new Set((sentence.toLowerCase().match(/[a-z]{4,}/g) || []));
+  if (!sentenceWords.size) return null;
+
+  const lines = resumeText.split("\n").map(l => l.trim()).filter(l => l.length > 25);
+  let best = null, bestScore = 0;
+  for (const line of lines) {
+    const lineWords = new Set((line.toLowerCase().match(/[a-z]{4,}/g) || []));
+    const overlap = [...sentenceWords].filter(w => lineWords.has(w)).length;
+    if (overlap > bestScore) { best = line; bestScore = overlap; }
+  }
+  return bestScore >= 1 ? best : null;
+}
+
 // Client-side heuristic requirement matrix (mirrors the backend's non-LLM fallback shape)
 function buildClientRequirementMatches(resumeText, jdText) {
   const rBlob = resumeText.toLowerCase();
-  const sentences = jdText.split(".").map(s => s.trim()).filter(s => s.length > 20).slice(0, 8);
+  const sentences = selectRequirementSentences(jdText);
 
   const matches = sentences.map(sentence => {
     const words = sentence.toLowerCase().split(/\s+/).filter(w => w.length > 4);
     const matchCount = words.filter(w => rBlob.includes(w)).length;
     const ratio = words.length ? matchCount / words.length : 0;
+    const requirementSnippet = truncateAtWord(sentence, 110);
 
     let status, evidence = null, suggestedEdit = null;
     if (ratio >= 0.5) {
       status = "Met";
       evidence = "Overlapping terms found across your resume.";
-    } else if (ratio >= 0.2) {
-      status = "Partial";
-      suggestedEdit = `Reframe a relevant past project to explicitly call out: '${sentence.slice(0, 110)}' — quantify the impact.`;
     } else {
-      status = "Missing";
-      suggestedEdit = `Add a bullet demonstrating experience with: '${sentence.slice(0, 110)}' — reframe a past project and quantify the impact.`;
+      status = ratio >= 0.2 ? "Partial" : "Missing";
+      const relevantLine = mostRelevantResumeLine(sentence, resumeText);
+      if (relevantLine) {
+        suggestedEdit = `Rewrite this existing line to explicitly cover "${requirementSnippet}": "${truncateAtWord(relevantLine, 140)}" — add the specific tool, scale, or outcome that ties it to this requirement.`;
+      } else {
+        suggestedEdit = `Your resume doesn't appear to mention "${requirementSnippet}" — if you have real experience with this, add a bullet naming the specific tool/method you used, the scale involved, and a quantified outcome (don't invent numbers you can't back up).`;
+      }
     }
 
-    return { requirement: sentence.slice(0, 150), status, evidence, suggested_edit: suggestedEdit };
+    return { requirement: truncateAtWord(sentence, 150), status, evidence, suggested_edit: suggestedEdit };
   });
 
   return matches.length ? matches : [{

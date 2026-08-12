@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, List
 
 import numpy as np
@@ -20,7 +21,11 @@ def _get_model():
         return _model
     try:
         from fastembed import TextEmbedding
-        _model = TextEmbedding(model_name=EMBEDDING_MODEL)
+        # Same JD_GLANCE_DATA_DIR as db.py, so the downloaded ONNX model
+        # survives container restarts instead of re-downloading each time.
+        data_dir = os.environ.get("JD_GLANCE_DATA_DIR")
+        cache_dir = os.path.join(data_dir, "fastembed_cache") if data_dir else None
+        _model = TextEmbedding(model_name=EMBEDDING_MODEL, cache_dir=cache_dir)
     except Exception as e:
         logger.warning(f"Local embedding model unavailable, falling back to TF-IDF only: {e}")
         _load_failed = True

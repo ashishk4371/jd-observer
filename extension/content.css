@@ -1,5 +1,5 @@
-/* Glassmorphism floating action button for JD Analyzer */
-.jd-analyzer-floating-pill {
+/* Glassmorphism floating action button for JD Glance */
+.jd-glance-floating-pill {
   position: absolute;
   z-index: 2147483647;
   display: flex;
@@ -22,18 +22,18 @@
   animation: jdPillPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.jd-analyzer-floating-pill:hover {
+.jd-glance-floating-pill:hover {
   background: rgba(30, 41, 59, 0.98);
   border-color: #818cf8;
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(129, 140, 248, 0.5);
 }
 
-.jd-analyzer-floating-pill:active {
+.jd-glance-floating-pill:active {
   transform: translateY(0) scale(0.98);
 }
 
-.jd-analyzer-floating-pill .jd-icon {
+.jd-glance-floating-pill .jd-icon {
   display: inline-block;
   font-size: 14px;
   animation: jdPulse 1.8s infinite;
@@ -56,7 +56,7 @@
 }
 
 /* Toast confirmation popup */
-.jd-analyzer-toast {
+.jd-glance-toast {
   position: fixed;
   bottom: 24px;
   right: 24px;

@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import sqlite3
 import uuid
 from pathlib import Path
@@ -6,12 +8,25 @@ from typing import Optional, Dict, Any, List
 
 import sqlite_vec
 
-DB_PATH = Path.home() / ".jd_analyzer_cache" / "jd_analyzer.db"
+# JD_GLANCE_DATA_DIR lets a deployment (e.g. a Docker volume) pin storage to a
+# fixed mount point; unset falls back to the original local-dev location.
+_DATA_DIR = Path(os.environ["JD_GLANCE_DATA_DIR"]) if os.environ.get("JD_GLANCE_DATA_DIR") else Path.home() / ".jd_glance_cache"
+DB_PATH = _DATA_DIR / "jd_glance.db"
+_LEGACY_DB_PATH = Path.home() / ".jd_analyzer_cache" / "jd_analyzer.db"  # pre-rename location
 EMBEDDING_DIM = 384  # BAAI/bge-small-en-v1.5
+
+
+def _migrate_legacy_db() -> None:
+    """One-time carry-over: this project was renamed from JD Analyzer to JD Glance.
+    If data exists at the old cache path and nothing exists at the new one yet,
+    move it forward instead of silently orphaning already-uploaded resumes."""
+    if not DB_PATH.exists() and _LEGACY_DB_PATH.exists():
+        shutil.move(str(_LEGACY_DB_PATH), str(DB_PATH))
 
 
 def get_connection() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _migrate_legacy_db()
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.enable_load_extension(True)

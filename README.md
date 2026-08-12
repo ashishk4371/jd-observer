@@ -1,10 +1,10 @@
-# JD Analyzer
+# JD Glance
 
 **AI-powered resume ↔ job description matcher**, delivered as a Chrome extension backed by a local FastAPI service. Upload one or more resumes, paste (or select) a job description, and get a holistic fit score — not just keyword overlap, but an LLM-driven read of whether your actual experience satisfies each requirement, with specific suggested edits for the gaps.
 
 ## Overview
 
-Most "resume matcher" tools stop at keyword counting. JD Analyzer does that too (fast, free, works offline), but layers a deeper pipeline on top:
+Most "resume matcher" tools stop at keyword counting. JD Glance does that too (fast, free, works offline), but layers a deeper pipeline on top:
 
 1. **Understand the resume once.** On upload, an LLM extracts a structured profile — skills, roles, seniority, key achievements — cached by a hash of the resume's own text, so re-analyzing against a new job description never re-reads or re-summarizes the resume from scratch.
 2. **Understand the job description.** The JD is broken into distinct requirements (skills, scope, seniority, leadership expectations).
@@ -21,7 +21,7 @@ Everything — resumes, extracted profiles, job descriptions, and every analysis
 - 🏆 **Resume ranking** — compare 2+ resumes against one job description and see which one actually fits best
 - 🔌 **Four LLM providers** — Claude, Gemini, OpenAI, or Groq, switchable per request, each with its own API key stored separately
 - 🧭 **Local semantic search** — embeddings generated locally (no API key, nothing leaves your machine) via `fastembed`, stored and compared with `sqlite-vec`
-- 💾 **Durable history** — every resume, profile, job description, and analysis persists in SQLite (`~/.jd_analyzer_cache/jd_analyzer.db`), not in memory
+- 💾 **Durable history** — every resume, profile, job description, and analysis persists in SQLite (`~/.jd_glance_cache/jd_glance.db`), not in memory
 - 🌐 **Works offline** — no backend running, no API key configured? The extension falls back to a client-side keyword-matching engine so it's never fully broken
 - 🖱️ **Grab-and-go** — select job description text on any webpage (LinkedIn, Indeed, Greenhouse, Lever…) and analyze it directly from the browser
 
@@ -35,7 +35,7 @@ Chrome Extension (Manifest V3)
         │
         │  REST (localhost:8000)
         ▼
-FastAPI backend (src/jd_analyzer/)
+FastAPI backend (src/jd_glance/)
   ├─ extractor.py    — file → text, text → skills/years (regex)
   ├─ similarity.py   — fast keyword/embedding score
   ├─ embeddings.py   — local embedding generation (fastembed)
@@ -44,7 +44,7 @@ FastAPI backend (src/jd_analyzer/)
   └─ main.py         — endpoints, orchestration
         │
         ▼
-~/.jd_analyzer_cache/jd_analyzer.db
+~/.jd_glance_cache/jd_glance.db
   (resumes, resume_profiles, job_descriptions, analyses + vector tables)
 ```
 
@@ -76,7 +76,7 @@ If the FastAPI backend isn't reachable, the extension degrades to a pure client-
 
 ```bash
 git clone <this-repo>
-cd jd-analyzer
+cd jd-glance
 
 # Install dependencies
 uv sync
@@ -88,7 +88,7 @@ cp .env.example .env
 
 # Start the server
 python run_server.py
-# or: uv run jd-analyzer
+# or: uv run jd-glance
 ```
 
 The API is now running at `http://127.0.0.1:8000`. Visit `http://127.0.0.1:8000/docs` for interactive API docs (FastAPI's auto-generated Swagger UI).
@@ -141,8 +141,8 @@ All endpoints are served from the FastAPI backend at `http://127.0.0.1:8000`. Fu
 ## Project Structure
 
 ```
-jd-analyzer/
-├── src/jd_analyzer/
+jd-glance/
+├── src/jd_glance/
 │   ├── main.py         # FastAPI app, endpoints, request orchestration
 │   ├── db.py           # SQLite + sqlite-vec schema and queries
 │   ├── llm.py          # Provider registry, prompts, requirement matching

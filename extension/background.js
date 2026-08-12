@@ -1,4 +1,4 @@
-// Background Service Worker for Job Description Analyzer
+// Background Service Worker for JD Glance
 
 // Set side panel behavior to open on extension icon click
 chrome.runtime.onInstalled.addListener(async () => {
@@ -10,11 +10,16 @@ chrome.runtime.onInstalled.addListener(async () => {
     console.error("Error setting side panel behavior:", err);
   }
 
-  // Create Context Menu item for selected text
-  chrome.contextMenus.create({
-    id: "analyze_selected_jd",
-    title: "⚡ Analyze with Resume (JD Analyzer)",
-    contexts: ["selection"]
+  // Create Context Menu item for selected text.
+  // removeAll() first: onInstalled can fire again (extension reload, browser
+  // restart) while Chrome still has the item from a prior registration —
+  // creating over it without clearing throws "duplicate id" otherwise.
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "analyze_selected_jd",
+      title: "⚡ Analyze with Resume (JD Glance)",
+      contexts: ["selection"]
+    });
   });
 });
 

@@ -11,7 +11,7 @@
 
   function showToast(message) {
     const toast = document.createElement("div");
-    toast.className = "jd-analyzer-toast";
+    toast.className = "jd-glance-toast";
     toast.innerHTML = `✨ <span>${message}</span>`;
     document.body.appendChild(toast);
     setTimeout(() => {
@@ -21,7 +21,7 @@
 
   function handleSelectionChange(e) {
     // Ignore clicks inside our floating pill
-    if (e && e.target && e.target.closest && e.target.closest(".jd-analyzer-floating-pill")) {
+    if (e && e.target && e.target.closest && e.target.closest(".jd-glance-floating-pill")) {
       return;
     }
 
@@ -50,7 +50,7 @@
 
       if (!floatingPill) {
         floatingPill = document.createElement("div");
-        floatingPill.className = "jd-analyzer-floating-pill";
+        floatingPill.className = "jd-glance-floating-pill";
         floatingPill.innerHTML = `<span class="jd-icon">⚡</span> Analyze with Resume`;
         
         floatingPill.addEventListener("mousedown", (evt) => {
@@ -62,7 +62,7 @@
               type: "OPEN_SIDE_PANEL_WITH_JD",
               text: selectedJDText
             }, (res) => {
-              showToast("Opening Job Description Analyzer...");
+              showToast("Opening JD Glance...");
               removeFloatingPill();
             });
           }
