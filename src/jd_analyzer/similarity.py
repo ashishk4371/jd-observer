@@ -1,11 +1,17 @@
 import re
 import numpy as np
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from .extractor import extract_skills, extract_years_of_experience
+from .embeddings import cosine_similarity_score
 
-def compute_similarity_metrics(resume_text: str, jd_text: str) -> Dict:
+def compute_similarity_metrics(
+    resume_text: str,
+    jd_text: str,
+    resume_embedding: Optional[bytes] = None,
+    jd_embedding: Optional[bytes] = None,
+) -> Dict:
     """
     Computes a comprehensive matching score combining:
     1. TF-IDF Cosine Similarity (Semantic & N-gram matching)
@@ -32,10 +38,14 @@ def compute_similarity_metrics(resume_text: str, jd_text: str) -> Dict:
             "rewrite_suggestions": []
         }
 
-    # 1. TF-IDF Similarity
-    vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
-    tfidf_matrix = vectorizer.fit_transform([r_text, j_text])
-    sem_sim = float(cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]) * 100.0
+    # 1. Semantic Similarity — embedding-based cosine similarity when both vectors
+    # are available (upgrade), otherwise fall back to TF-IDF n-gram cosine similarity.
+    if resume_embedding is not None and jd_embedding is not None:
+        sem_sim = cosine_similarity_score(resume_embedding, jd_embedding)
+    else:
+        vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+        tfidf_matrix = vectorizer.fit_transform([r_text, j_text])
+        sem_sim = float(cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]) * 100.0
 
     # 2. Skill Extraction & Coverage
     resume_skills = set(extract_skills(r_text))

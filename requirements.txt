@@ -5,6 +5,8 @@ langchain-google-genai
 langchain-groq
 langchain-openai
 langchain-ollama
+sqlite-vec
+fastembed
 python-dotenv
 pydantic
 pymupdf
