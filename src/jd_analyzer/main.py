@@ -17,6 +17,11 @@ from .models import (
     ExperienceMatchDetail,
     LLMExperienceAnalysis,
     ResumeProfile,
+    ResumeListItem,
+    ResumeListResponse,
+    CompareResumesRequest,
+    CompareResumesResponse,
+    RankedResumeResult,
 )
 from . import db
 from .embeddings import embed_text
@@ -143,39 +148,28 @@ async def upload_resume(
     )
 
 
-@app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(request: AnalyzeRequest):
-    resume_row = None
-    if request.resume_id:
-        resume_row = db.get_resume(request.resume_id)
-
-    if resume_row is None and request.resume_text:
-        resume_row = get_or_create_resume(request.resume_text)
-
-    if resume_row is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume text is required. Please provide a valid resume_id or resume_text."
-        )
+def run_analysis(
+    resume_row: Dict[str, Any],
+    jd_row: Dict[str, Any],
+    api_key: Optional[str],
+    provider: str,
+) -> AnalyzeResponse:
+    """The full holistic pipeline for one resume against one job description:
+    keyword/embedding similarity + LLM requirement matching, blended into a score,
+    persisted as an analyses row. Shared by /analyze (one resume) and /compare
+    (many resumes against the same JD, one run_analysis call each)."""
     resume_text = resume_row["raw_text"]
 
-    if not request.job_description.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Job description text is empty."
-        )
-
     # 1. Resolve the resume's structured profile (cached when resume_id was uploaded
-    # via /upload_resume; built on the fly otherwise), the JD row, and their embeddings.
-    profile_dict = get_or_build_profile(resume_row, api_key=request.api_key, provider=request.provider or "auto")
-    jd_row = get_or_embed_job_description(request.job_description)
+    # via /upload_resume; built on the fly otherwise) and both embeddings.
+    profile_dict = get_or_build_profile(resume_row, api_key=api_key, provider=provider)
     resume_vector = db.get_resume_profile_vector(profile_dict["id"])
     jd_vector = db.get_job_description_vector(jd_row["id"])
 
     # 2. Compute Base Keyword & Semantic Similarity (embedding-based when available)
     metrics = compute_similarity_metrics(
         resume_text,
-        request.job_description,
+        jd_row["text"],
         resume_embedding=resume_vector,
         jd_embedding=jd_vector,
     )
@@ -183,9 +177,9 @@ async def analyze(request: AnalyzeRequest):
 
     llm_res = match_resume_to_jd(
         profile=profile_dict,
-        job_description=request.job_description,
-        api_key=request.api_key,
-        provider=request.provider or "auto"
+        job_description=jd_row["text"],
+        api_key=api_key,
+        provider=provider
     )
 
     if llm_res.is_llm_powered:
@@ -271,6 +265,31 @@ async def analyze(request: AnalyzeRequest):
     return response
 
 
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze(request: AnalyzeRequest):
+    resume_row = None
+    if request.resume_id:
+        resume_row = db.get_resume(request.resume_id)
+
+    if resume_row is None and request.resume_text:
+        resume_row = get_or_create_resume(request.resume_text)
+
+    if resume_row is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume text is required. Please provide a valid resume_id or resume_text."
+        )
+
+    if not request.job_description.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Job description text is empty."
+        )
+
+    jd_row = get_or_embed_job_description(request.job_description)
+    return run_analysis(resume_row, jd_row, api_key=request.api_key, provider=request.provider or "auto")
+
+
 @app.post("/analyze_direct", response_model=AnalyzeResponse)
 async def analyze_direct(
     job_description: str = Form(...),
@@ -280,12 +299,66 @@ async def analyze_direct(
     fname = file.filename or "resume.pdf"
     content_bytes = await file.read()
     resume_text = extract_text_from_file(content_bytes, fname)
-    
+
     return await analyze(AnalyzeRequest(
         resume_text=resume_text,
         job_description=job_description,
         api_key=api_key
     ))
+
+
+@app.get("/resumes", response_model=ResumeListResponse)
+async def list_resumes():
+    """The resume library — every resume ever uploaded, durable across restarts."""
+    items = []
+    for row in db.list_resumes():
+        profile = db.get_profile_by_content_hash(row["content_hash"])
+        items.append(ResumeListItem(
+            resume_id=row["id"],
+            filename=row["filename"],
+            uploaded_at=row["uploaded_at"],
+            seniority_level=profile["seniority_level"] if profile else None,
+            summary=profile["summary"] if profile else None,
+        ))
+    return ResumeListResponse(resumes=items)
+
+
+@app.delete("/resumes/{resume_id}")
+async def remove_resume(resume_id: str):
+    if db.get_resume(resume_id) is None:
+        raise HTTPException(status_code=404, detail="Resume not found.")
+    db.delete_resume(resume_id)
+    return {"status": "deleted", "resume_id": resume_id}
+
+
+@app.post("/compare", response_model=CompareResumesResponse)
+async def compare_resumes(request: CompareResumesRequest):
+    """Rank multiple resumes against one job description using the same holistic
+    pipeline as /analyze (embedding similarity + LLM requirement matching) for
+    each — not a cheap keyword-only pre-rank."""
+    if not request.resume_ids:
+        raise HTTPException(status_code=400, detail="At least one resume_id is required.")
+    if not request.job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description text is empty.")
+
+    # The JD is embedded once and reused for every resume in the comparison.
+    jd_row = get_or_embed_job_description(request.job_description)
+    provider = request.provider or "auto"
+
+    results = []
+    for resume_id in request.resume_ids:
+        resume_row = db.get_resume(resume_id)
+        if resume_row is None:
+            continue  # skip unknown ids rather than fail the whole comparison
+        analysis = run_analysis(resume_row, jd_row, api_key=request.api_key, provider=provider)
+        results.append(RankedResumeResult(
+            resume_id=resume_row["id"],
+            filename=resume_row["filename"],
+            analysis=analysis,
+        ))
+
+    results.sort(key=lambda r: r.analysis.match_score, reverse=True)
+    return CompareResumesResponse(results=results)
 
 
 def main():

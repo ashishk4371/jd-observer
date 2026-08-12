@@ -77,3 +77,27 @@ class AnalyzeResponse(BaseModel):
     llm_analysis: Optional[LLMExperienceAnalysis] = None
     summary: str
     actionable_tips: List[str]
+
+class ResumeListItem(BaseModel):
+    resume_id: str
+    filename: str
+    uploaded_at: str
+    seniority_level: Optional[str] = None
+    summary: Optional[str] = None
+
+class ResumeListResponse(BaseModel):
+    resumes: List[ResumeListItem]
+
+class CompareResumesRequest(BaseModel):
+    resume_ids: List[str]
+    job_description: str
+    api_key: Optional[str] = None
+    provider: Optional[str] = "auto"
+
+class RankedResumeResult(BaseModel):
+    resume_id: str
+    filename: str
+    analysis: AnalyzeResponse
+
+class CompareResumesResponse(BaseModel):
+    results: List[RankedResumeResult]

@@ -119,6 +119,28 @@ def insert_resume(filename: str, content_hash: str, raw_text: str) -> str:
     return resume_id
 
 
+def list_resumes() -> List[Dict[str, Any]]:
+    rows = get_db().execute(
+        "SELECT * FROM resumes ORDER BY uploaded_at DESC"
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delete_resume(resume_id: str) -> None:
+    """Remove a resume, its profile, and its embedding vector. Analyses that
+    reference this resume are left alone — they're a historical snapshot,
+    not a live join."""
+    conn = get_db()
+    profile = conn.execute(
+        "SELECT id FROM resume_profiles WHERE resume_id = ?", (resume_id,)
+    ).fetchone()
+    if profile:
+        conn.execute("DELETE FROM vec_resume_profiles WHERE id = ?", (profile["id"],))
+        conn.execute("DELETE FROM resume_profiles WHERE id = ?", (profile["id"],))
+    conn.execute("DELETE FROM resumes WHERE id = ?", (resume_id,))
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Resume profiles
 # ---------------------------------------------------------------------------

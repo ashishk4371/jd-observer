@@ -58,11 +58,11 @@
     <!-- Main Content Scroll Area -->
     <main class="main-content">
 
-      <!-- Section 1: Resume Upload & Store -->
+      <!-- Section 1: Resume Library -->
       <section class="card resume-card">
         <div class="card-header">
-          <h2><span class="icon">📄</span> Your Resume</h2>
-          <span id="resumeBadge" class="pill pill-warning">No Resume Attached</span>
+          <h2><span class="icon">📄</span> Your Resumes</h2>
+          <span id="resumeBadge" class="pill pill-warning">No Resumes Added</span>
         </div>
 
         <div id="dropZone" class="drop-zone">
@@ -70,41 +70,14 @@
           <div class="drop-zone-content">
             <div class="upload-icon">📁</div>
             <p class="drop-title">Drop PDF, DOCX, or TXT resume</p>
-            <p class="drop-subtitle">or <span class="browse-link">browse files</span></p>
+            <p class="drop-subtitle">or <span class="browse-link">browse files</span> — adds to your library</p>
           </div>
         </div>
 
-        <div id="resumeInfo" class="resume-info hidden">
-          <div class="resume-meta">
-            <span class="file-icon">📜</span>
-            <div class="file-details">
-              <span id="resumeFileName" class="file-name">resume.pdf</span>
-              <span id="resumeCharCount" class="file-size">0 chars • 0 skills extracted</span>
-            </div>
-            <button id="btnRemoveResume" class="btn-icon-danger" title="Remove resume">🗑️</button>
-          </div>
-          <details class="text-preview-details">
-            <summary>View Extracted Text</summary>
-            <textarea id="resumeTextPreview" readonly class="text-preview-box"></textarea>
-          </details>
-          <details id="profileSnapshotDetails" class="text-preview-details hidden">
-            <summary>🧠 What We Understood About You</summary>
-            <div class="profile-snapshot">
-              <p id="profileSummaryText" class="profile-summary-text"></p>
-              <div class="profile-meta-row">
-                <span class="profile-meta-item"><strong>Seniority:</strong> <span id="profileSeniorityText"></span></span>
-              </div>
-              <div class="profile-meta-row">
-                <strong>Domains:</strong>
-                <div id="profileDomainsChips" class="chips-container"></div>
-              </div>
-              <div class="profile-meta-row">
-                <strong>Key Skills:</strong>
-                <div id="profileSkillsChips" class="chips-container"></div>
-              </div>
-            </div>
-          </details>
+        <div id="resumeLibraryList" class="resume-library-list">
+          <!-- One card per resume, inserted dynamically -->
         </div>
+        <p id="compareHint" class="tab-desc hidden">Select 2 or more resumes above to rank them against a job description.</p>
       </section>
 
       <!-- Section 2: Job Description Input -->
@@ -120,8 +93,23 @@
         </button>
       </section>
 
+      <!-- Section 2.5: Comparison Ranking (shown when 2+ resumes are analyzed together) -->
+      <section id="comparisonSection" class="comparison-section hidden">
+        <div class="card">
+          <div class="card-header">
+            <h2><span class="icon">🏆</span> Resume Ranking</h2>
+            <span id="comparisonCountBadge" class="pill pill-info">0 resumes</span>
+          </div>
+          <p class="tab-desc">Ranked by the full holistic match for each resume — keyword coverage, semantic similarity, and AI requirement analysis, not just keywords. Click any result to see its full breakdown below.</p>
+          <div id="comparisonRankingList" class="comparison-ranking-list">
+            <!-- Ranked rows inserted dynamically -->
+          </div>
+        </div>
+      </section>
+
       <!-- Section 3: Analysis Results (Hidden by default) -->
       <section id="resultsSection" class="results-section hidden">
+        <p id="resultsForResumeText" class="results-for-resume hidden"></p>
         <!-- Match Score Hero Gauge -->
         <div class="card score-card">
           <div class="score-header">
