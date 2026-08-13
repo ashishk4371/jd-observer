@@ -9,7 +9,7 @@ if (window.pdfjsLib) {
 let state = {
   apiBaseUrl: "http://localhost:8000",
   provider: "claude",
-  apiKeys: { claude: "", gemini: "", openai: "", groq: "" },
+  apiKeys: { claude: "", gemini: "", openai: "", groq: "", ollama: "" },
   isApiOnline: false,
   resumes: [],                    // [{ resumeId, localKey, fileName, resumeText, resumeProfile }]
   selectedResumeIds: new Set(),   // keys (resumeId when known, else localKey)
@@ -22,7 +22,8 @@ const PROVIDER_LABELS = {
   claude: "Claude",
   gemini: "Gemini",
   openai: "OpenAI",
-  groq: "Groq"
+  groq: "Groq",
+  ollama: "Ollama"
 };
 
 // Common Technical Skills for Client-side Fallback Parser
@@ -46,6 +47,7 @@ const elements = {
   providerSelect: document.getElementById("providerSelect"),
   apiKeyLabel: document.getElementById("apiKeyLabel"),
   apiKeyInput: document.getElementById("apiKeyInput"),
+  apiKeyHelp: document.getElementById("apiKeyHelp"),
 
   dropZone: document.getElementById("dropZone"),
   resumeFileInput: document.getElementById("resumeFileInput"),
@@ -212,11 +214,23 @@ function setupEventListeners() {
   });
 }
 
-// Show the API key field for whichever provider is currently selected
+// Show the API key field for whichever provider is currently selected.
+// Ollama runs locally with no API key — that slot instead holds the model
+// name the user has already pulled (e.g. `ollama pull llama3.1`), so it's
+// shown as a plain text field with different labeling, not a password field.
 function renderProviderKeyField() {
   elements.providerSelect.value = state.provider;
-  elements.apiKeyLabel.textContent = `API Key for ${PROVIDER_LABELS[state.provider]}:`;
-  elements.apiKeyInput.placeholder = `Enter your ${PROVIDER_LABELS[state.provider]} API key`;
+  if (state.provider === "ollama") {
+    elements.apiKeyLabel.textContent = "Ollama Model Name:";
+    elements.apiKeyInput.type = "text";
+    elements.apiKeyInput.placeholder = "e.g. llama3.1, qwen2.5:7b, mistral";
+    elements.apiKeyHelp.textContent = "Requires Ollama running locally (ollama serve) with this model pulled (ollama pull <model>). Nothing leaves your machine — no API key needed.";
+  } else {
+    elements.apiKeyLabel.textContent = `API Key for ${PROVIDER_LABELS[state.provider]}:`;
+    elements.apiKeyInput.type = "password";
+    elements.apiKeyInput.placeholder = `Enter your ${PROVIDER_LABELS[state.provider]} API key`;
+    elements.apiKeyHelp.textContent = "Each provider's key is stored separately in chrome.storage.local. Switch providers above to enter a different key.";
+  }
   elements.apiKeyInput.value = state.apiKeys[state.provider] || "";
 }
 

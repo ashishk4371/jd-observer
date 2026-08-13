@@ -19,7 +19,7 @@ Everything — resumes, extracted profiles, job descriptions, and every analysis
 - 📄 **Multi-resume library** — upload multiple resume versions (PDF/DOCX/TXT), keep them all, select any combination to analyze or compare
 - 🧠 **Holistic AI matching** — requirement-by-requirement Met/Partial/Missing breakdown with evidence and tailored bullet suggestions, not just a keyword score
 - 🏆 **Resume ranking** — compare 2+ resumes against one job description and see which one actually fits best
-- 🔌 **Four LLM providers** — Claude, Gemini, OpenAI, or Groq, switchable per request, each with its own API key stored separately
+- 🔌 **Five LLM providers** — Claude, Gemini, OpenAI, Groq, or a fully local Ollama model, switchable per request, each with its own key (or model name) stored separately
 - 🧭 **Local semantic search** — embeddings generated locally (no API key, nothing leaves your machine) via `fastembed`, stored and compared with `sqlite-vec`
 - 💾 **Durable history** — every resume, profile, job description, and analysis persists in SQLite (`~/.jd_glance_cache/jd_glance.db`), not in memory
 - 🌐 **Works offline** — no backend running, no API key configured? The extension falls back to a client-side keyword-matching engine so it's never fully broken
@@ -114,6 +114,17 @@ GROQ_API_KEY=your_key_here         # Llama 3.3 70B
 ```
 
 Alternatively (or in addition), each provider's key can be entered directly in the extension's Settings panel — stored per-provider in the browser, sent only with your own requests, never persisted server-side beyond the request that used it.
+
+### Fully local mode (Ollama) — zero cost, nothing leaves your machine
+
+No API key, no cloud provider, no hosting bill. Install [Ollama](https://ollama.com), pull a model, and point the extension at it:
+
+```bash
+ollama pull llama3.1     # or qwen2.5:7b, mistral, etc. — any instruction-tuned model
+ollama serve              # runs on http://localhost:11434 by default
+```
+
+Then in the extension's Settings panel, select **Ollama (Local, Free)** as the provider and type the model name (`llama3.1`) in place of an API key. The FastAPI backend, the SQLite database, and the LLM itself all run on your own machine — the resume and job description text never leave it. To make Ollama the server-side default/fallback instead of a per-request choice, set `OLLAMA_MODEL` (and `OLLAMA_BASE_URL` if not on the default port) in `.env`.
 
 ## Usage
 

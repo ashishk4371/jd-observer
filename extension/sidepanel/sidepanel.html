@@ -45,12 +45,13 @@
           <option value="gemini">Gemini (Google)</option>
           <option value="openai">OpenAI</option>
           <option value="groq">Groq</option>
+          <option value="ollama">Ollama (Local, Free)</option>
         </select>
       </div>
       <div class="setting-field">
         <label for="apiKeyInput" id="apiKeyLabel">API Key for Claude:</label>
         <input type="password" id="apiKeyInput" placeholder="Enter your API key for the selected provider">
-        <p class="setting-help">Each provider's key is stored separately in chrome.storage.local. Switch providers above to enter a different key.</p>
+        <p class="setting-help" id="apiKeyHelp">Each provider's key is stored separately in chrome.storage.local. Switch providers above to enter a different key.</p>
       </div>
       <button id="btnSaveSettings" class="btn btn-primary btn-sm">Save Configuration</button>
     </div>

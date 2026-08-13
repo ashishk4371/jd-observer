@@ -59,12 +59,26 @@ def _init_groq(key: str):
     return ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=key, temperature=0.2)
 
 
+def _init_ollama(model: str):
+    from langchain_ollama import ChatOllama
+    # Ollama runs on the user's own machine — no API key, just a model name they've
+    # already pulled (`ollama pull <model>`). Base URL is server-side config, not
+    # per-request, since it's an infra detail rather than something that varies per user.
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    return ChatOllama(model=model, base_url=base_url, temperature=0.2)
+
+
 # provider key -> (init function, human-readable label, server-side env var fallbacks)
+# For every provider except "ollama" the "key" is a real API key. For "ollama" the same
+# slot carries the model name instead (e.g. "llama3.1") — _key_for_provider treats it as
+# an opaque string either way, so the whole resolve/fallback/retry pipeline below applies
+# unchanged: a request-supplied value scoped to "ollama", or the OLLAMA_MODEL env var.
 PROVIDER_REGISTRY: Dict[str, Tuple[Any, str, List[str]]] = {
     "claude": (_init_claude, "Claude Opus 5", ["ANTHROPIC_API_KEY"]),
     "gemini": (_init_gemini, "Gemini 2.5 Flash", ["GEMINI_API_KEY", "GOOGLE_API_KEY"]),
     "openai": (_init_openai, "OpenAI GPT-4o mini", ["OPENAI_API_KEY"]),
     "groq": (_init_groq, "Groq Llama 3.3", ["GROQ_API_KEY"]),
+    "ollama": (_init_ollama, "Ollama (local)", ["OLLAMA_MODEL"]),
 }
 
 
@@ -100,6 +114,8 @@ def _resolve_llm_candidates(api_key: Optional[str], provider: str = "auto") -> L
         if not key:
             continue
         init_fn, label, _ = PROVIDER_REGISTRY[name]
+        if name == "ollama":
+            label = f"Ollama ({key}, local)"
         try:
             llm = init_fn(key)
         except Exception as e:
